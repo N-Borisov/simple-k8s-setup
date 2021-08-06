@@ -1,0 +1,49 @@
+---
+- hosts: all
+  become: true
+  tasks:
+  - name: Install packages
+    yum:
+      name:
+        - wget
+        - curl
+        - yum-utils
+        - git
+        - python3-libs
+        - libselinux-python3
+      state: present
+  - name:
+    shell: yum-config-manager --add-repo  https://download.docker.com/linux/centos/docker-ce.repo && yum install -y docker-ce docker-ce-cli containerd.io
+  - name: Start and Enable Docker Daemon
+    service:
+      name: docker
+      state: started
+      enabled: true
+  - name: disable selinx
+    ansible.posix.selinux:
+      policy: targeted
+      state: permissive
+  - name: Remove swapfile from /etc/fstab
+    mount:
+      name: "{{ item }}"
+      fstype: swap
+      state: absent
+    with_items:
+      - swap
+      - none
+  - name: Disable swap
+    command: swapoff -a
+    when: ansible_swaptotal_mb > 0
+  - name : Stop Firewalld
+    shell: systemctl disable --now firewalld
+  - name: Enable K8s repo
+    ansible.builtin.script:
+      cmd: add-kube-repo.sh
+  - name: Install Kubeadm
+    yum:
+      name:
+        - kubeadm
+        - kubelet
+        - kubectl
+  - name: Enable Kublet
+    shell: systemctl enable kubelet
